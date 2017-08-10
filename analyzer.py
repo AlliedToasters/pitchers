@@ -3,6 +3,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 def set_plot(pitchers, names, column, n, year):
+    """Takes a dictionary of dataframes as arg1, a list of names as arg2,
+    a string as arg3, an integer as arg4, and an int year as arg5. Ranks
+    pitchers(arg1) based on column (arg3) in year (arg5) and divides 
+    into n quantiles (arg4), then plots the ranked pitchers as a blue
+    line, those in list "names" as red x's, and dotted lines and group
+    labels to show groups given by report.
+    """
     fig = plt.figure(figsize=(16,10))
     ax = fig.add_subplot(111)
     ax.set_title('2016 Injuries')
@@ -35,6 +42,13 @@ def set_plot(pitchers, names, column, n, year):
 
                 
 def report(pitchers, names, column, n, year):
+    """Takes a dictionary of dataframes as arg1, a list of names as arg2,
+    a string as arg3, an integer as arg4, and an int year as arg5. Ranks
+    pitchers(arg1) based on column (arg3) in year (arg5) and divides 
+    into n quantiles (arg4), counts the number of names(arg2) that 
+    belong in each quantile, and reports back the number in each quantile
+    (called groups 1-n) as a percentage of all pitchers.
+    """
     group_size = int(len(pitchers)/n)
     ranked_values = []
     for pitcher in pitchers:
