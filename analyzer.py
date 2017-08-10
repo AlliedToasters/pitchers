@@ -51,6 +51,8 @@ def report(pitchers, names, column, n, year):
             ind = list(df[df['Year']==year].index)[0]
             if ranked_values[lower_bound] <= (float(df.loc[ind, column])) < ranked_values[upper_bound-1]:
                 basket += 1
+        if i == (n-1):
+            basket += 1 #Because above for loop does not count last item
         print('Group {}, {}% of all players, represents {}% of the group.'.format((i+1), (100/n), 
 100*(basket/len(names))))
         lower_bound += group_size
