@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 
 def players_outs(df_in):
+    """Takes a dataframe as argument and returns a dictionary,
+    keys are player names, values are dataframes with columns
+    'Year' and 'Outs Pitched'
+    """
     players = {}
     for row in df_in.index:
         rowdict = dict(df_in.loc[row])
@@ -19,6 +23,10 @@ def players_outs(df_in):
     return players
     
 def consol(df):
+    """consol takes a dataframe as its argument and returns a dataframe.
+    If argument df has multiple rows with the same year, it adds together
+    'Outs Pitched' values and gives the sum to the single row for that year.
+    """
     count = {}
     for row in df.index:
         count[df.loc[row, 'Year']] = 0
@@ -30,6 +38,9 @@ def consol(df):
     return result
 
 def fill_gaps(df):
+    """Takes a dataframe argument. If df has a gap between years (like
+    2014, 2016), adds a row for the missing year with 0 outs pitched.
+    """
     last_year = int(df.iloc[0]['Year'])
     years_to_add = []
     for row in df.index:
@@ -37,7 +48,7 @@ def fill_gaps(df):
         if (this_year - last_year) != 1:
             gap = this_year - last_year
             for i in range(1, gap):
-                years_to_add.append(last_year + 1)
+                years_to_add.append(last_year + i)
         last_year = this_year
     for year in years_to_add:
         i = list(df[df['Year']==(year - 1)].index)[0]
@@ -47,15 +58,16 @@ def fill_gaps(df):
         new_df['Year'] = years
         new_df['Outs Pitched'] = outs_pitched
         df = new_df
-    if 2015 in list(df['Year']):
-        if df.iloc[-1]['Year'] != 2016:
-            row2016 = pd.DataFrame(columns=df.columns)
-            row2016['Year'] = 2016
-            df = pd.concat([df, pd.DataFrame])
     return df
         
 
 def tally_outs(df):
+    """Takes a dataframe as argument, adds up a running total for
+     total outs pitched in an entire season up until the given
+    season. Adds two new rows, one with the total number of outs
+    pitched at the beginning of the given season, one with the total
+    at the end of the season. Returns a dataframe.
+    """
     if len(df) <= 1:
         df.loc[1, 'Outs TD Start'] = 0
         df.loc[1, 'Outs TD Finish'] = df.loc[1, 'Outs Pitched']
@@ -70,6 +82,13 @@ def tally_outs(df):
     return df
 
 def season_load(df):
+    """Takes dataframe as argument. Calculates average outs pitched to date
+    for a given season and average outs pitched for total career including
+    future seasons, creates new columns 'Season Load' and 'Season Load TD'.
+    Season load is outs pitched/average outs pitched per season, season load
+    TD is outs pitched/ average outs pitched to date. Returns a dataframe with
+    two new columns.
+    """
     if len(df) <= 1:
         df.loc[1, 'Mean Outs/Season'] = df.loc[1, 'Outs Pitched']
         df.loc[1, 'Season Load TD'] = 1
@@ -94,6 +113,10 @@ def season_load(df):
     return df
 
 def format_names(name_list):
+    """takes a list of names of format "First Middle Lastname" and formats
+    them into format "lastnfi01' (first five of last name, first two of first, 01.)
+    returns a list of formatted names.
+    """
     for name in name_list:
         index = name_list.index(name)
         name = name.lower()
@@ -113,6 +136,11 @@ def format_names(name_list):
     return name_list
 
 def reconcile_names(name_list, reference_list):
+    """Takes two lists of names of specific format. Finds corresponding name in
+    second list and matches its two digit numeral ending. If not found, adds
+    name not found to names_not_found. Returns a list of matched names and
+    a list of names not found.
+    """
     names_to_reconcile = list(reference_list)
     names_not_found = []
     for i, name in enumerate(name_list):
