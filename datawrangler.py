@@ -2,83 +2,55 @@ import numpy as np
 import pandas as pd
 from collections import OrderedDict
 
-def players_outs(df_in):
-    """Takes a dataframe as argument and returns a dictionary,
-    keys are player names, values are dataframes with columns
-    'Year' and 'Outs Pitched'
+def build_frame(df_in, year=2015):
+    """Builds the dataframe we will use for this study of pitchers.
+    Takes Lahman's database and gets out volume for pitcher. Row index
+    is playerID, columns: Prior Seasons Out Volume(PSOV), 
+    # Prior Seasons(NoPS), Mean Out Volume/Season(OV/S), 
+    {year} Out Volume (OV{year}), {year} Normalized Out Volume (NOV{year}),
+    Injured in 2016 (I2016) (Bool, default False)
     """
-    players = {} #This will be returned at the end of the function.
+    pitchers = set() #will take all pitchers appearing in 2015
     for row in df_in.index:
-        rowdict = dict(df_in.loc[row]) #Dummy dict, keys are column names, values in corresponding row
-        name = rowdict['playerID'] 
-        if name not in players: #Checks to see if players already has this player
-            df = pd.DataFrame(columns=['Year', 'Outs Pitched'], index=[1])
-            # df will be value, playerID will be key in dict players
-            df['Year'] = rowdict['year'] #df has 'Year' column
-            df['Outs Pitched'] = rowdict['Outs Pitched'] #df has 'Outs Pitched' column
-            players[name] = df #assign df to key name
-        else: #in case playerID already in players
-            df = pd.DataFrame(columns=['Year', 'Outs Pitched'], index=[(list(players[name].index)[-1]+1)])
-            #creates a new dataframe with extra row
-            df['Year'] = rowdict['year'] #populate new row
-            df['Outs Pitched'] = rowdict['Outs Pitched']
-            players[name] = pd.concat([players[name], df]) #concat old df with new row 
-    return players 
-
-def fill_gaps(df):
-    """Takes a dataframe argument. If df has a gap between years (like
-    2014, 2016), adds a row for the missing year with 0 outs pitched.
-    """
-    last_year = int(df.iloc[0]['Year']) #start w/ first year
-    years_to_add = [] #this will track years we need to add
-    for row in df.index:
-        this_year = int(df.loc[row, 'Year'])
-        gap = this_year - last_year
-        for i in range(1, gap): #if gap is 0 or 1, no iteration
-            years_to_add.append(last_year + i) #adds necessary year
-        last_year = this_year #advances cycle
-    for year in years_to_add: #to add year:
-        i = list(df[df['Year']==(year - 1)].index)[0] #gets index for year-1
-        new_df = pd.DataFrame(columns = df.columns, index=range(1, (len(df) + 2))) #new df w/ proper len
-        years = list(df.loc[1:i, 'Year']) + [year] + list(df.loc[i+1:, 'Year']) #insert necessary year
-        outs_pitched = list(df.loc[1:i, 'Outs Pitched']) + [0] + list(df.loc[i+1:, 'Outs Pitched']) #0 for outs pitched
-        new_df['Year'] = years #insert into new df
-        new_df['Outs Pitched'] = outs_pitched
-        df = new_df
-    return df
+        if df_in.loc[row]['yearID'] == year:
+            pitchers.add(df_in.loc[row]['playerID'])
+    col = [   #these will be columns for df_out
+      'PSOV',
+      'NoPS',
+      'OV/S',
+      'OV{}'.format(str(year)),
+      'NOV{}'.format(str(year)),
+      'Inj2016'
+    ]
+    df_out = pd.DataFrame(index=pitchers, columns=col) #build frame
+    for player in df_out.index: #iterate over players and calculate needed values
+        window = df_in[df_in['playerID'] == player] #just this player's rows
+        seasons_prior = set() #use set to avoid counting duplicate years
+        psov = 0
+        ovyr = 0
+        for row in window.index: #iterate through window to extract info
+            if window.loc[row]['yearID'] < year:
+                seasons_prior.add(window.loc[row]['yearID'])
+                psov += window.loc[row]['IPouts']
+            if window.loc[row]['yearID'] == year:
+                ovyr += window.loc[row]['IPouts']
+            if window.loc[row]['yearID'] > year:
+                pass
+        df_out.loc[player]['PSOV'] = psov #assign values
+        df_out.loc[player]['OV{}'.format(str(year))] = ovyr
+        df_out.loc[player]['NoPS'] = len(seasons_prior)
+        if len(seasons_prior) == 0: 
+            df_out.loc[player]['NOV{}'.format(str(year))] = 1 #if first season, normalized out vol = 1
+        elif len(seasons_prior) == 1:
+            df_out.loc[player]['OV/S'] = psov
+            df_out.loc[player]['NOV{}'.format(str(year))] = ovyr/psov
+        elif len(seasons_prior) > 1:
+            mean_out_volume = psov/len(seasons_prior) #calculate prior mean outs/season
+            df_out.loc[player]['OV/S'] = mean_out_volume
+            df_out.loc[player]['NOV{}'.format(str(year))] = ovyr/mean_out_volume
+        df_out.loc[player]['Inj2016'] = False #default not injured in 2016
+    return df_out
         
-
-def season_load(df):
-    """Takes dataframe as argument. Calculates average outs pitched to date
-    for a given season and average outs pitched for total career including
-    future seasons, creates new columns 'Season Load' and 'Season Load TD'.
-    Season load is outs pitched/average outs pitched per season, season load
-    TD is outs pitched/ average outs pitched to date. Returns a dataframe with
-    two new columns.
-    """
-    if len(df) <= 1: #if one season, load is 1
-        df.loc[1, 'Mean Outs/Season'] = df.loc[1, 'Outs Pitched']
-        df.loc[1, 'Season Load TD'] = 1
-        df.loc[1, 'Season Load'] = 1
-    else:
-        for row in df.index:
-            if row == 1: #first season, mean outs == outs pitched
-                df.loc[1, 'Mean Outs/Season'] = df.loc[1, 'Outs Pitched'] #
-            else: #is mean outs per season before starting season
-                df.loc[row, 'Mean Outs/Season'] = df.loc[row, 'Outs TD Start']/(row-1)
-            if df.loc[row, 'Mean Outs/Season'] != 0: #avoid divide by zero error
-                df.loc[row, 'Season Load TD'] = df.loc[row, 'Outs Pitched']/df.loc[row, 'Mean Outs/Season']
-            #season load TD is outs pitched/mean outs/season that year
-            else:
-                df.loc[row, 'Season Load TD'] = 1 #default to 1
-        total_outs = df.iloc[-1]['Outs TD Finish']
-        avg_outs = total_outs/len(df)
-        for row in df.index:
-            if avg_outs != 0: #season load is outs pitched over career average outs pitched/season
-                df.loc[row, 'Season Load'] = df.loc[row, 'Outs Pitched'] / avg_outs
-            else:
-                df.loc[row, 'Season Load'] = 1
-    return df
 
 def format_names(name_list):
     """takes a list of names of format "First Middle Lastname" and formats
@@ -126,4 +98,6 @@ def reconcile_names(name_list, reference_list):
             new_name = name[:-2] + name_numeral #builds new name in our format
             name_list[i] = new_name #replaces name in list
             name = new_name #will break while loop if correct
+    print('{} names were not found.'.format(len(names_not_found)))
     return name_list, names_not_found
+
